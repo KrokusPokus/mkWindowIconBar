@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(mkWindowIconBar VERSION 0.1.0 LANGUAGES C CXX) # C: the generated Wayland protocol code
+project(mkWindowIconBar VERSION 1.0 LANGUAGES C CXX) # C: the generated Wayland protocol code
 
 set(QT_MIN_VERSION "6.8.0")
 set(KF6_MIN_VERSION "6.10.0")
