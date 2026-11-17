@@ -17,5 +17,8 @@
         "Version": "0.1.0",
         "Website": "https://github.com/KrokusPokus/mkWindowIconBar"
     },
-    "X-Plasma-API-Minimum-Version": "6.0"
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-Provides": [
+        "org.kde.plasma.multitasking"
+    ]
 }
