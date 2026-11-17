@@ -20,5 +20,9 @@
       <label>Whether to show only the windows on the current virtual desktop.</label>
       <default>true</default>
     </entry>
+    <entry name="distanceDependentAnimation" type="Bool">
+      <label>Whether the duration of the move animation of a button depends on its distance to its new place (longDuration up to one button, down to shortDuration from two on), instead of a fixed shortDuration.</label>
+      <default>false</default>
+    </entry>
   </group>
 </kcfg>

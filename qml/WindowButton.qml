@@ -189,8 +189,9 @@ PlasmaCore.ToolTipArea {
     readonly property bool highlighted: (mouseArea.containsMouse && !mouseArea.dragging) || activeFocus || listView.dropHoverIndex === index
 
     // The dragged button stays in front of the others, which slide aside below it, until its own slide into
-    // the last place is over (the move transition of the list, shortDuration)
-    z: mouseArea.dragging || raiseTimer.running ? 1 : 0
+    // the last place is over: the move transition of the list (shortDuration, raiseTimer) or its own move
+    // animation (distance dependent, moveAnimation)
+    z: mouseArea.dragging || raiseTimer.running || moveAnimation.running ? 1 : 0
 
     Timer {
         id: raiseTimer
@@ -209,11 +210,86 @@ PlasmaCore.ToolTipArea {
         return margin;
     }
 
-    onXChanged: publishGeometry()
-    onYChanged: publishGeometry()
+    onXChanged: {
+        publishGeometry();
+        animateMove();
+    }
+    onYChanged: {
+        publishGeometry();
+        animateMove();
+    }
     onWidthChanged: publishGeometry()
     onHeightChanged: publishGeometry()
-    Component.onCompleted: publishGeometry()
+    Component.onCompleted: {
+        oldX = x;
+        oldY = y;
+        completed = true;
+        publishGeometry();
+    }
+
+    // Distance dependent move animation (setting "distanceDependentAnimation"; otherwise the list animates the
+    // moves with its transitions, see main.qml). As in Task.qml of the task manager: the button jumps to its
+    // new place, a Translate shifts it back to where it was seen, and the shift runs down to 0. An interrupted
+    // animation adds its remaining shift. Unlike the task manager the duration depends on the distance: up to
+    // one button longDuration (as there), farther shorter, down to shortDuration from two buttons on, so that
+    // buttons that fall behind while dragging fast catch up quickly.
+    readonly property bool distanceDependentAnimation: Plasmoid.configuration.distanceDependentAnimation
+    property bool completed: false
+    property real oldX: 0
+    property real oldY: 0
+
+    onDistanceDependentAnimationChanged: {
+        moveAnimation.stop();
+        moveShift.x = 0;
+        moveShift.y = 0;
+    }
+
+    transform: Translate {
+        id: moveShift
+    }
+
+    function animateMove(): void {
+        const dx = oldX - x + moveShift.x;
+        const dy = oldY - y + moveShift.y;
+        // Always tracked, so that switching the setting on starts from the right place
+        oldX = x;
+        oldY = y;
+        if (!completed || !distanceDependentAnimation) {
+            return;
+        }
+        moveAnimation.stop();
+        const length = listView.orientation === ListView.Horizontal ? width : height;
+        const distance = length > 0 ? Math.sqrt(dx * dx + dy * dy) / length : 0;
+        const longDuration = Kirigami.Units.longDuration;
+        const shortDuration = Math.min(Kirigami.Units.shortDuration, longDuration);
+        moveAnimation.duration = distance > 1
+            ? Math.max(shortDuration, Math.min(longDuration, longDuration / distance))
+            : longDuration;
+        moveShift.x = dx;
+        moveShift.y = dy;
+        moveAnimation.start();
+    }
+
+    ParallelAnimation {
+        id: moveAnimation
+
+        property int duration: Kirigami.Units.longDuration
+
+        NumberAnimation {
+            target: moveShift
+            property: "x"
+            to: 0
+            duration: moveAnimation.duration
+            easing.type: Easing.OutQuad
+        }
+        NumberAnimation {
+            target: moveShift
+            property: "y"
+            to: 0
+            duration: moveAnimation.duration
+            easing.type: Easing.OutQuad
+        }
+    }
 
     KSvg.FrameSvgItem {
         id: frame

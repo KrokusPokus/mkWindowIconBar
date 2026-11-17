@@ -27,7 +27,8 @@ icon.
 * Middle click: close the window
 * Tooltip as in the task manager without thumbnails: application name, window title, close button
 * Context menu: move to another virtual desktop or screen, minimize, maximize, keep above others, close
-* Options: only the windows of the current virtual desktop, only the windows of the current screen
+* Options: only the windows of the current virtual desktop, only the windows of the current screen,
+  move animation with a duration that depends on the distance
 * Reordering by drag and drop
 * Highlighting of the active window, minimized windows and windows demanding attention,
   drawn with the task bar graphics of the Plasma theme

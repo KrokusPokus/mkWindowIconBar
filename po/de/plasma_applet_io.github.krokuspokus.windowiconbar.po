@@ -49,3 +49,22 @@ msgctxt ""
 "(output identifier)"
 msgid "%1 %2 (%3)"
 msgstr "%1 %2 (%3)"
+
+#: qml/ConfigGeneral.qml
+msgctxt "@label for checkbox"
+msgid "Moving buttons:"
+msgstr "Verschieben von Knöpfen:"
+
+#: qml/ConfigGeneral.qml
+msgctxt "@option:check"
+msgid "Animation duration depends on the distance"
+msgstr "Animationsdauer hängt von der Entfernung ab"
+
+#: qml/ConfigGeneral.qml
+msgctxt "@info explanation of the checkbox above"
+msgid ""
+"Short distances slowly, as in the original task manager; buttons that are far "
+"from their place catch up faster. Off: always the same short duration."
+msgstr ""
+"Kurze Wege langsam wie in der Original-Fensterleiste, weit entfernte Knöpfe "
+"holen schneller auf. Aus: immer dieselbe kurze Dauer."

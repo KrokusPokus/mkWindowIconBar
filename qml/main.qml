@@ -96,15 +96,14 @@ PlasmoidItem {
         reuseItems: false
 
         // While a button is dragged, it slides to its new place (move) and the others slide aside
-        // (moveDisplaced), as in the task manager
-        move: Transition {
-            NumberAnimation {
-                properties: "x,y"
-                duration: Kirigami.Units.shortDuration
-                easing.type: Easing.OutQuad
-            }
-        }
-        moveDisplaced: Transition {
+        // (moveDisplaced), as in the task manager. With the setting "distanceDependentAnimation" every
+        // button animates its own moves instead (WindowButton.animateMove()), the list does not.
+        move: Plasmoid.configuration.distanceDependentAnimation ? null : moveTransition
+        moveDisplaced: Plasmoid.configuration.distanceDependentAnimation ? null : moveTransition
+
+        Transition {
+            id: moveTransition
+
             NumberAnimation {
                 properties: "x,y"
                 duration: Kirigami.Units.shortDuration
