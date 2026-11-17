@@ -185,9 +185,16 @@ Item {
                 dragging = true;
                 button.listView.dragging = true;
             }
-            // Live reordering: the button moves to the place under the mouse, the others slide aside
-            const pos = mapToItem(button.listView.contentItem, mouse.x, mouse.y);
-            const target = button.listView.indexAt(pos.x, pos.y);
+            // Live reordering: the button moves to the place under the mouse, the others slide aside.
+            // Only the position along the bar counts: the mouse may leave the bar while the button is held
+            // (Wayland keeps sending the moves to the bar until the button is released). Across the bar the
+            // middle of this button is taken; beyond the ends the first or last place.
+            const list = button.listView;
+            const pos = mapToItem(list.contentItem, mouse.x, mouse.y);
+            const horizontal = list.orientation === ListView.Horizontal;
+            const x = horizontal ? Math.max(0, Math.min(pos.x, list.contentWidth - 1)) : button.x + button.width / 2;
+            const y = horizontal ? button.y + button.height / 2 : Math.max(0, Math.min(pos.y, list.contentHeight - 1));
+            const target = list.indexAt(x, y);
             if (target >= 0 && target !== button.index) {
                 button.windowModel.move(button.index, target);
             }
