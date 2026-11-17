@@ -1,8 +1,7 @@
 # mkWindowIconBar
 
-A minimalist window bar for the KDE Plasma 6 panel. It replaces the
-*Icons-Only Task Manager* and nothing else: application launcher, system tray
-and the other panel widgets stay as they are.
+A minimalist window bar widget for the KDE Plasma 6 panel, an alternative to the
+*Icons-Only Task Manager*.
 
 Every open window is shown as one icon. A click switches to it.
 
@@ -58,7 +57,7 @@ sudo pacman -S --needed cmake extra-cmake-modules qt6-base qt6-declarative qt6-w
 ```
 
 Then edit the panel, choose *Add Widgets…*, and drag *Window Icon Bar* (German: *Fensterleiste mit Fenstersymbolen*) into the panel.
-The original task manager can be removed afterwards.
+Or swap an existing task manager in place: in the panel's edit mode, choose *Show Alternatives* on it.
 
 Plasma loads applet plugins only at startup: after installing a new version,
 plasmashell has to be restarted (`install.sh` does that).
