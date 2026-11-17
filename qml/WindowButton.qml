@@ -23,6 +23,8 @@ import plasma.applet.io.github.krokuspokus.windowiconbar as WindowIconBar
 // One window: its icon on the task frame of the Plasma theme ("widgets/tasks").
 // Left click: activate, or minimize if it is the active window. Middle click: close.
 // Right click: context menu. Drag: move the button to another place.
+// Keyboard (as in the task manager): Tab reaches the buttons, Return/Enter/Space activate, the menu key opens
+// the context menu, Ctrl+Shift+arrow moves the button.
 Item {
     id: button
 
@@ -49,6 +51,57 @@ Item {
         return "normal";
     }
 
+    function activate(): void {
+        windowModel.activateOrMinimize(index);
+    }
+
+    function showContextMenu(): void {
+        const menu = contextMenuComponent.createObject(button) as PlasmaExtras.Menu;
+        menu.openRelative();
+    }
+
+    // Moves this button by one place (keyboard), within the bounds of the list
+    function moveBy(step: int): void {
+        const target = index + step;
+        if (target >= 0 && target < listView.count) {
+            windowModel.move(index, target);
+        }
+    }
+
+    // Accessibility, as in the task manager: a button named after the window
+    Accessible.role: Accessible.Button
+    Accessible.name: model.display
+    // The translation of the task manager is used ("%1 aktivieren")
+    Accessible.description: model.display
+        ? i18ndc("plasma_applet_org.kde.plasma.taskmanager", "@info:usagetip %1 task name", "Activate %1", model.display)
+        : ""
+    Accessible.onPressAction: activate()
+
+    activeFocusOnTab: true
+    Keys.onReturnPressed: activate()
+    Keys.onEnterPressed: activate()
+    Keys.onSpacePressed: activate()
+    Keys.onMenuPressed: showContextMenu()
+    Keys.onLeftPressed: event => {
+        if ((event.modifiers & Qt.ControlModifier) && (event.modifiers & Qt.ShiftModifier)) {
+            moveBy(-1);
+        } else {
+            event.accepted = false;
+        }
+    }
+    Keys.onRightPressed: event => {
+        if ((event.modifiers & Qt.ControlModifier) && (event.modifiers & Qt.ShiftModifier)) {
+            moveBy(1);
+        } else {
+            event.accepted = false;
+        }
+    }
+    Keys.onUpPressed: event => Keys.leftPressed(event)
+    Keys.onDownPressed: event => Keys.rightPressed(event)
+
+    // Hover frame also for the keyboard focus, so that it can be seen which button Return activates
+    readonly property bool highlighted: mouseArea.containsMouse || activeFocus
+
     function publishGeometry(): void {
         windowModel.publishGeometry(index, button);
     }
@@ -73,7 +126,7 @@ Item {
         anchors.fill: parent
         imagePath: "widgets/tasks"
         // Hovered: "<state>-hover", then "hover", then the plain state (taskPrefixHovered())
-        prefix: mouseArea.containsMouse
+        prefix: button.highlighted
             ? [...button.edgePrefix(button.basePrefix + "-hover"), ...button.edgePrefix("hover"), ...button.edgePrefix(button.basePrefix)]
             : button.edgePrefix(button.basePrefix)
     }
@@ -87,7 +140,7 @@ Item {
             - button.adjustMargin(button.height, verticalMargins, button.taskFrameMargins.bottom)
         width: height
         source: button.model.decoration
-        active: mouseArea.containsMouse
+        active: button.highlighted
     }
 
     PlasmaCore.ToolTipArea {
@@ -98,60 +151,68 @@ Item {
         active: !mouseArea.dragging && !button.contextMenuOpen
     }
 
-    PlasmaExtras.Menu {
-        id: contextMenu
+    // Created when it is opened and destroyed when it closes (as in the task manager)
+    Component {
+        id: contextMenuComponent
 
-        visualParent: button
-        placement: {
-            switch (Plasmoid.location) {
-            case PlasmaCore.Types.LeftEdge:
-                return PlasmaExtras.Menu.RightPosedTopAlignedPopup;
-            case PlasmaCore.Types.TopEdge:
-                return PlasmaExtras.Menu.BottomPosedLeftAlignedPopup;
-            case PlasmaCore.Types.RightEdge:
-                return PlasmaExtras.Menu.LeftPosedTopAlignedPopup;
-            default:
-                return PlasmaExtras.Menu.TopPosedLeftAlignedPopup;
+        PlasmaExtras.Menu {
+            visualParent: button
+            placement: {
+                switch (Plasmoid.location) {
+                case PlasmaCore.Types.LeftEdge:
+                    return PlasmaExtras.Menu.RightPosedTopAlignedPopup;
+                case PlasmaCore.Types.TopEdge:
+                    return PlasmaExtras.Menu.BottomPosedLeftAlignedPopup;
+                case PlasmaCore.Types.RightEdge:
+                    return PlasmaExtras.Menu.LeftPosedTopAlignedPopup;
+                default:
+                    return PlasmaExtras.Menu.TopPosedLeftAlignedPopup;
+                }
             }
-        }
-        onStatusChanged: button.contextMenuOpen = (status === PlasmaExtras.Menu.Open)
+            onStatusChanged: {
+                button.contextMenuOpen = (status === PlasmaExtras.Menu.Open);
+                if (status === PlasmaExtras.Menu.Closed) {
+                    destroy();
+                }
+            }
 
-        // The right click is taken by this menu, so it has to offer what the default menu of an applet
-        // offers: configure this widget, configure the panel (as ContextMenu.qml of the task manager does)
-        PlasmaExtras.MenuItem {
-            property PlasmaCore.Action configureAction: null
+            // The right click is taken by this menu, so it has to offer what the default menu of an applet
+            // offers: configure this widget, configure the panel (as ContextMenu.qml of the task manager does)
+            PlasmaExtras.MenuItem {
+                property PlasmaCore.Action configureAction: null
 
-            enabled: configureAction && configureAction.enabled
-            visible: configureAction && configureAction.visible
-            text: configureAction ? configureAction.text : ""
-            icon: configureAction ? configureAction.icon : ""
-            onClicked: configureAction.trigger()
+                enabled: configureAction && configureAction.enabled
+                visible: configureAction && configureAction.visible
+                text: configureAction ? configureAction.text : ""
+                icon: configureAction ? configureAction.icon : ""
+                onClicked: configureAction.trigger()
 
-            Component.onCompleted: configureAction = Plasmoid.internalAction("configure")
-        }
+                Component.onCompleted: configureAction = Plasmoid.internalAction("configure")
+            }
 
-        PlasmaExtras.MenuItem {
-            property PlasmaCore.Action editModeAction: null
+            PlasmaExtras.MenuItem {
+                property PlasmaCore.Action editModeAction: null
 
-            enabled: editModeAction && editModeAction.enabled
-            visible: editModeAction && editModeAction.visible
-            text: editModeAction ? editModeAction.text : ""
-            icon: editModeAction ? editModeAction.icon : ""
-            onClicked: editModeAction.trigger()
+                enabled: editModeAction && editModeAction.enabled
+                visible: editModeAction && editModeAction.visible
+                text: editModeAction ? editModeAction.text : ""
+                icon: editModeAction ? editModeAction.icon : ""
+                onClicked: editModeAction.trigger()
 
-            Component.onCompleted: editModeAction = Plasmoid.containment.internalAction("configure")
-        }
+                Component.onCompleted: editModeAction = Plasmoid.containment.internalAction("configure")
+            }
 
-        PlasmaExtras.MenuItem {
-            separator: true
-        }
+            PlasmaExtras.MenuItem {
+                separator: true
+            }
 
-        PlasmaExtras.MenuItem {
-            // The translation of the task manager is used ("&Schließen")
-            text: i18ndc("plasma_applet_org.kde.plasma.taskmanager", "@action:inmenu", "&Close")
-            icon: "window-close"
-            enabled: button.model.IsClosable
-            onClicked: button.windowModel.close(button.index)
+            PlasmaExtras.MenuItem {
+                // The translation of the task manager is used ("&Schließen")
+                text: i18ndc("plasma_applet_org.kde.plasma.taskmanager", "@action:inmenu", "&Close")
+                icon: "window-close"
+                enabled: button.model.IsClosable
+                onClicked: button.windowModel.close(button.index)
+            }
         }
     }
 
@@ -217,9 +278,9 @@ Item {
             if (mouse.button === Qt.MiddleButton) {
                 button.windowModel.close(button.index);
             } else if (mouse.button === Qt.RightButton) {
-                contextMenu.openRelative();
+                button.showContextMenu();
             } else {
-                button.windowModel.activateOrMinimize(button.index);
+                button.activate();
             }
         }
     }

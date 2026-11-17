@@ -86,6 +86,8 @@ Q_SIGNALS:
 private Q_SLOTS:
     // KWin's org.kde.KWin.VirtualDesktopManager.currentChanged
     void setCurrentVirtualDesktop(const QString &id);
+    // Reads the current virtual desktop from KWin (at start, and whenever KWin's D-Bus service appears)
+    void fetchCurrentVirtualDesktop();
 
 private:
     using PlasmaWindow = WindowIconBar::PlasmaWindow;
@@ -118,4 +120,5 @@ private:
     QRect m_screenGeometry;
     bool m_filterByVirtualDesktop = false;
     QString m_currentVirtualDesktop; // id (UUID) of KWin's current virtual desktop, empty while unknown
+    quint64 m_activationCounter = 0; // increases with every activation (PlasmaWindow::lastActivated)
 };

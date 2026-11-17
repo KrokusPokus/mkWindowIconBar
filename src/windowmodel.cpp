@@ -16,6 +16,7 @@
 #include <QDBusMessage>
 #include <QDBusPendingCallWatcher>
 #include <QDBusPendingReply>
+#include <QDBusServiceWatcher>
 #include <QDBusVariant>
 #include <QDataStream>
 #include <QFuture>
@@ -63,6 +64,7 @@ public:
     QFlags<state> windowState;
     QRect geometry;
     QList<QString> virtualDesktops; // empty: on all virtual desktops
+    quint64 lastActivated = 0;       // WindowModel::m_activationCounter when it was activated last, 0: never
     QPointer<PlasmaWindow> parentWindow;
     bool wasUnmapped = false;
 
@@ -325,21 +327,15 @@ WindowModel::WindowModel(QObject *parent)
         });
     });
 
-    // The current virtual desktop comes from KWin over D-Bus: its change signal, and the initial value read once
+    // The current virtual desktop comes from KWin over D-Bus: its change signal, and the value read at start.
+    // The signal connection survives a restart of KWin's service; the value is read again when it appears
+    // (also if it was not there yet at start).
     QDBusConnection bus = QDBusConnection::sessionBus();
     bus.connect(kKWinService, kVirtualDesktopPath, kVirtualDesktopInterface, QStringLiteral("currentChanged"),
                 this, SLOT(setCurrentVirtualDesktop(QString)));
-    QDBusMessage message = QDBusMessage::createMethodCall(kKWinService, kVirtualDesktopPath,
-                                                          QStringLiteral("org.freedesktop.DBus.Properties"), QStringLiteral("Get"));
-    message << kVirtualDesktopInterface << QStringLiteral("current");
-    auto *watcher = new QDBusPendingCallWatcher(bus.asyncCall(message), this);
-    connect(watcher, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *call) {
-        const QDBusPendingReply<QDBusVariant> reply = *call;
-        if (reply.isValid()) {
-            setCurrentVirtualDesktop(reply.value().variant().toString());
-        }
-        call->deleteLater();
-    });
+    auto *serviceWatcher = new QDBusServiceWatcher(kKWinService, bus, QDBusServiceWatcher::WatchForRegistration, this);
+    connect(serviceWatcher, &QDBusServiceWatcher::serviceRegistered, this, &WindowModel::fetchCurrentVirtualDesktop);
+    fetchCurrentVirtualDesktop();
 
     // A window can move to another screen because the screens change
     auto onScreensChanged = [this] {
@@ -349,6 +345,21 @@ WindowModel::WindowModel(QObject *parent)
     };
     connect(qGuiApp, &QGuiApplication::screenAdded, this, onScreensChanged);
     connect(qGuiApp, &QGuiApplication::screenRemoved, this, onScreensChanged);
+}
+
+void WindowModel::fetchCurrentVirtualDesktop()
+{
+    QDBusMessage message = QDBusMessage::createMethodCall(kKWinService, kVirtualDesktopPath,
+                                                          QStringLiteral("org.freedesktop.DBus.Properties"), QStringLiteral("Get"));
+    message << kVirtualDesktopInterface << QStringLiteral("current");
+    auto *watcher = new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(message), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *call) {
+        const QDBusPendingReply<QDBusVariant> reply = *call;
+        if (reply.isValid()) {
+            setCurrentVirtualDesktop(reply.value().variant().toString());
+        }
+        call->deleteLater();
+    });
 }
 
 WindowModel::~WindowModel()
@@ -444,8 +455,12 @@ QVariant WindowModel::data(const QModelIndex &index, int role) const
     case Qt::DisplayRole:
         return window->title;
     case Qt::DecorationRole:
-        // Exactly what KWin reports: no .desktop file icon takes precedence
-        return window->icon;
+        // Exactly what KWin reports: no .desktop file icon takes precedence. A generic window icon if there is
+        // none (a pixmap icon that could not be read, a theme icon name the icon theme does not know).
+        if (!window->icon.isNull()) {
+            return window->icon;
+        }
+        return QIcon::fromTheme(QStringLiteral("preferences-system-windows"));
     case IsActive:
         return isActive(window);
     case IsMinimized:
@@ -467,6 +482,9 @@ void WindowModel::addWindow(PlasmaWindow *window)
         return;
     }
     m_windows.push_back(window);
+    if (window->hasState(State::state_active)) {
+        window->lastActivated = ++m_activationCounter;
+    }
 
     connect(window, &PlasmaWindow::titleChanged, this, [this, window] {
         emitChanged(window, {Qt::DisplayRole});
@@ -500,6 +518,9 @@ void WindowModel::addWindow(PlasmaWindow *window)
         }
         // Activity and attention of a transient are shown at its leader
         if (changed & State::state_active) {
+            if (window->hasState(State::state_active)) {
+                window->lastActivated = ++m_activationCounter;
+            }
             emitChanged(leaderOf(window), {IsActive});
         }
         if (changed & State::state_demands_attention) {
@@ -661,13 +682,26 @@ void WindowModel::activateOrMinimize(int row)
         return;
     }
 
-    // A transient demanding attention (e.g. a dialog asking something) is brought to the front instead
+    // Which window of the group (the window and its transients, e.g. dialogs) gets the focus:
+    // - a transient demanding attention (e.g. a dialog asking something),
+    // - otherwise the one that was active last: KWin raises the window together with its dialogs, but does
+    //   not reliably give the focus to an open dialog (see requestActivate() of libtaskmanager). The protocol
+    //   does not tell whether a dialog is modal, so the one the user was in last is taken.
     PlasmaWindow *target = window;
+    PlasmaWindow *attention = nullptr;
     for (PlasmaWindow *candidate : std::as_const(m_windows)) {
-        if (candidate != window && candidate->hasState(State::state_demands_attention) && leaderOf(candidate) == window) {
-            target = candidate;
-            break;
+        if (candidate == window || leaderOf(candidate) != window) {
+            continue;
         }
+        if (!attention && candidate->hasState(State::state_demands_attention)) {
+            attention = candidate;
+        }
+        if (candidate->lastActivated > target->lastActivated) {
+            target = candidate;
+        }
+    }
+    if (attention) {
+        target = attention;
     }
     target->set_state(State::state_active | State::state_minimized, State::state_active);
 }
