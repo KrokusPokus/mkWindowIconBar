@@ -16,7 +16,7 @@ include(KDECompilerSettings NO_POLICY_SCOPE)
 include(ECMQmlModule)
 
 find_package(Qt6 ${QT_MIN_VERSION} CONFIG REQUIRED COMPONENTS Core Gui Qml Quick Concurrent DBus WaylandClient)
-find_package(KF6 ${KF6_MIN_VERSION} REQUIRED COMPONENTS I18n)            # ki18n_install() for the translations
+find_package(KF6 ${KF6_MIN_VERSION} REQUIRED COMPONENTS I18n Service)    # ki18n_install(); application names from .desktop files
 find_package(Qt6GuiPrivate ${QT_MIN_VERSION} REQUIRED NO_MODULE)       # QNativeInterface::Private::QWaylandWindow
 find_package(Plasma REQUIRED)                                          # plasma_add_applet(), Plasma::Applet
 find_package(PlasmaWaylandProtocols 1.10 REQUIRED)                     # plasma-window-management.xml
@@ -30,6 +30,7 @@ plasma_add_applet(${APPLET_ID}
     QML_SOURCES
         qml/main.qml
         qml/WindowButton.qml
+        qml/WindowToolTip.qml
         qml/config.qml
         qml/ConfigGeneral.qml
     CPP_SOURCES
@@ -56,6 +57,7 @@ target_link_libraries(${APPLET_ID} PRIVATE
     Qt::Quick
     Qt::Concurrent
     Qt::DBus
+    KF6::Service
     Qt::WaylandClient
 )
 

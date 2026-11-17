@@ -25,7 +25,9 @@ import plasma.applet.io.github.krokuspokus.windowiconbar as WindowIconBar
 // Right click: context menu. Drag: move the button to another place.
 // Keyboard (as in the task manager): Tab reaches the buttons, Return/Enter/Space activate, the menu key opens
 // the context menu, Ctrl+Shift+arrow moves the button.
-Item {
+// The button itself is the tooltip area (as Task.qml of the task manager): the hover events of the mouse area
+// inside reach it, a sibling would not get them.
+PlasmaCore.ToolTipArea {
     id: button
 
     required property int index
@@ -36,6 +38,21 @@ Item {
     property var taskFrameMargins
     property var edgePrefix
     property bool contextMenuOpen: false
+    // The tooltip content shared by all buttons (WindowToolTip), set to this button while it is hovered
+    property Item toolTipItem
+
+    mainItem: toolTipItem
+    location: Plasmoid.location
+    // The tooltip has a close button and can be clicked
+    interactive: true
+    // Not while dragging, and the tooltip must not cover the context menu
+    active: !mouseArea.dragging && !contextMenuOpen
+
+    onContainsMouseChanged: {
+        if (containsMouse && toolTipItem) {
+            (toolTipItem as WindowToolTip).button = button;
+        }
+    }
 
     // Frame state as in the task manager: attention, minimized, focus (active) or normal
     readonly property string basePrefix: {
@@ -210,13 +227,6 @@ Item {
         active: button.highlighted
     }
 
-    PlasmaCore.ToolTipArea {
-        anchors.fill: parent
-        mainText: button.model.display
-        location: Plasmoid.location
-        // Not while dragging, and the tooltip must not cover the context menu
-        active: !mouseArea.dragging && !button.contextMenuOpen
-    }
 
     // Created when it is opened and destroyed when it closes (as in the task manager)
     Component {

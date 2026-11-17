@@ -60,6 +60,7 @@ public:
         IsOnAllVirtualDesktops,
         IsVirtualDesktopsChangeable,
         ScreenGeometry,         // geometry of the screen the center of the window is on
+        AppName,                // name of the application (tooltip), see WindowModel::applicationName()
         AppId,
     };
     Q_ENUM(Roles)
@@ -143,6 +144,9 @@ private:
     bool isDemandingAttention(const PlasmaWindow *window) const;
     // The window of a row, nullptr for an invalid row
     PlasmaWindow *windowAt(int row) const;
+    // Name of the application of a window, for the tooltip only: the Name= of its .desktop file (found by the
+    // app id KWin reports), otherwise the name of its executable, otherwise the app id
+    static QString applicationName(const PlasmaWindow *window);
     // Reads the "desktops" property of KWin's VirtualDesktopManager (D-Bus type a(uss): position, id, name)
     void setVirtualDesktopsFromDBus(const QVariant &value);
 

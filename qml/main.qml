@@ -60,6 +60,14 @@ PlasmoidItem {
         filterByVirtualDesktop: Plasmoid.configuration.showOnlyCurrentDesktop
     }
 
+    // The tooltip content, one for all buttons (as in the task manager): the hovered button sets itself
+    WindowToolTip {
+        id: windowToolTip
+
+        visible: false
+        windowModel: windowModel
+    }
+
     // Only for the margins of the task frame (the task manager does the same)
     KSvg.FrameSvgItem {
         id: taskFrame
@@ -103,6 +111,7 @@ PlasmoidItem {
             height: root.buttonHeight
             taskFrameMargins: taskFrame.margins
             edgePrefix: root.edgePrefix
+            toolTipItem: windowToolTip
         }
 
         // Moving buttons must publish their new place for the minimize animation

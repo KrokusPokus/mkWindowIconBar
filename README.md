@@ -25,7 +25,7 @@ icon.
 * One icon per window, in the order the windows were opened
 * Left click: activate the window, or minimize it if it is the active one
 * Middle click: close the window
-* Tooltip with the window title
+* Tooltip as in the task manager without thumbnails: application name, window title, close button
 * Context menu: move to another virtual desktop or screen, minimize, maximize, keep above others, close
 * Options: only the windows of the current virtual desktop, only the windows of the current screen
 * Reordering by drag and drop

@@ -20,6 +20,8 @@
 #include <QDBusServiceWatcher>
 #include <QDBusVariant>
 #include <QDataStream>
+#include <QFile>
+#include <QFileInfo>
 #include <QFuture>
 #include <QFutureWatcher>
 #include <QGuiApplication>
@@ -27,10 +29,14 @@
 #include <QPointer>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QRegularExpression>
 #include <QScreen>
 #include <QWaylandClientExtension>
 #include <QtConcurrentRun>
 #include <qpa/qplatformwindow_p.h>
+
+#include <KService>
+#include <KSycoca>
 
 #include <algorithm>
 
@@ -61,6 +67,8 @@ public:
     const QString uuid;
     QString title;
     QString appId;
+    quint32 pid = 0;
+    QString appName; // cache of WindowModel::applicationName(), empty: not determined yet
     QIcon icon;
     QFlags<state> windowState;
     QRect geometry;
@@ -79,6 +87,7 @@ Q_SIGNALS:
     void initialStateDone();
     void titleChanged();
     void appIdChanged();
+    void pidChanged();
     void iconChanged();
     void stateChanged(uint32_t changedFlags);
     void geometryChanged();
@@ -99,6 +108,11 @@ protected:
     {
         this->title = title;
         Q_EMIT titleChanged();
+    }
+    void org_kde_plasma_window_pid_changed(uint32_t pid) override
+    {
+        this->pid = pid;
+        Q_EMIT pidChanged();
     }
     void org_kde_plasma_window_app_id_changed(const QString &app_id) override
     {
@@ -340,6 +354,16 @@ WindowModel::WindowModel(QObject *parent)
     connect(serviceWatcher, &QDBusServiceWatcher::serviceRegistered, this, &WindowModel::fetchVirtualDesktops);
     fetchVirtualDesktops();
 
+    // Installed or removed applications: the names are determined again
+    connect(KSycoca::self(), &KSycoca::databaseChanged, this, [this] {
+        for (PlasmaWindow *window : std::as_const(m_windows)) {
+            window->appName.clear();
+        }
+        if (!m_rows.empty()) {
+            Q_EMIT dataChanged(index(0), index(count() - 1), {AppName});
+        }
+    });
+
     // A window can move to another screen because the screens change
     auto onScreensChanged = [this] {
         if (m_filterByScreen) {
@@ -507,6 +531,7 @@ QHash<int, QByteArray> WindowModel::roleNames() const
     roles.insert(IsOnAllVirtualDesktops, QByteArrayLiteral("IsOnAllVirtualDesktops"));
     roles.insert(IsVirtualDesktopsChangeable, QByteArrayLiteral("IsVirtualDesktopsChangeable"));
     roles.insert(ScreenGeometry, QByteArrayLiteral("ScreenGeometry"));
+    roles.insert(AppName, QByteArrayLiteral("AppName"));
     roles.insert(AppId, QByteArrayLiteral("AppId"));
     return roles;
 }
@@ -552,6 +577,13 @@ QVariant WindowModel::data(const QModelIndex &index, int role) const
         return window->hasState(State::state_virtual_desktop_changeable);
     case ScreenGeometry:
         return screenGeometryAt(window->geometry.center());
+    case AppName:
+        if (window->appName.isEmpty()) {
+            // Determined when it is needed (the tooltip), then cached. data() is const, the cache is not part of
+            // the state of the model.
+            const_cast<PlasmaWindow *>(window)->appName = applicationName(window);
+        }
+        return window->appName;
     case AppId:
         return window->appId;
     default:
@@ -576,7 +608,12 @@ void WindowModel::addWindow(PlasmaWindow *window)
         emitChanged(window, {Qt::DecorationRole});
     });
     connect(window, &PlasmaWindow::appIdChanged, this, [this, window] {
-        emitChanged(window, {AppId});
+        window->appName.clear();
+        emitChanged(window, {AppId, AppName});
+    });
+    connect(window, &PlasmaWindow::pidChanged, this, [this, window] {
+        window->appName.clear();
+        emitChanged(window, {AppName});
     });
     connect(window, &PlasmaWindow::geometryChanged, this, [this, window] {
         if (m_filterByScreen) {
@@ -847,6 +884,42 @@ void WindowModel::move(int from, int to)
     m_windows.insert(to > from ? it + 1 : it, window);
 
     endMoveRows();
+}
+
+QString WindowModel::applicationName(const PlasmaWindow *window)
+{
+    // .desktop file: the app id of a Wayland client is the name of its .desktop file (e.g. org.kde.dolphin),
+    // XWayland clients get the class of their WM_CLASS, which usually matches a .desktop file name in lower case
+    if (!window->appId.isEmpty()) {
+        KService::Ptr service = KService::serviceByDesktopName(window->appId);
+        if (!service) {
+            service = KService::serviceByDesktopName(window->appId.toLower());
+        }
+        if (service && !service->name().isEmpty()) {
+            return service->name();
+        }
+    }
+
+    // Executable of the process. /proc/<pid>/exe has the full name, /proc/<pid>/comm is cut after 15 characters
+    // but is also readable for processes of other users.
+    if (window->pid != 0) {
+        const QString proc = QStringLiteral("/proc/%1/").arg(window->pid);
+        QString exe = QFileInfo(proc + QStringLiteral("exe")).symLinkTarget();
+        // The executable was replaced (e.g. updated) since the process started
+        exe.remove(QRegularExpression(QStringLiteral(" \\(deleted\\)$")));
+        if (!exe.isEmpty()) {
+            return QFileInfo(exe).fileName();
+        }
+        QFile comm(proc + QStringLiteral("comm"));
+        if (comm.open(QIODevice::ReadOnly)) {
+            const QString name = QString::fromUtf8(comm.readAll()).trimmed();
+            if (!name.isEmpty()) {
+                return name;
+            }
+        }
+    }
+
+    return window->appId;
 }
 
 WindowModel::PlasmaWindow *WindowModel::windowAt(int row) const
