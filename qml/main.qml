@@ -74,6 +74,8 @@ PlasmoidItem {
 
         // Set by a button while it is dragged: the list must not scroll then
         property bool dragging: false
+        // Button under something dragged from outside (files, text), -1 if none: shown with the hover frame
+        property int dropHoverIndex: -1
 
         anchors.fill: parent
         orientation: root.vertical ? ListView.Vertical : ListView.Horizontal
@@ -114,6 +116,58 @@ PlasmoidItem {
                 const item = itemAtIndex(i);
                 if (item) {
                     (item as WindowButton).publishGeometry();
+                }
+            }
+        }
+    }
+
+    // Something dragged from outside (e.g. files from the file manager) and held over a button brings the
+    // window to the front after a moment, so that it can be dropped into the window. As in MouseHandler.qml
+    // of the task manager. A drop on the bar itself does nothing: the bar knows windows, not applications
+    // that could open the files.
+    DropArea {
+        id: dropArea
+
+        anchors.fill: list
+
+        // Widgets dragged into the panel are left to the panel
+        onEntered: drag => {
+            if (drag.formats.indexOf("text/x-plasmoidservicename") >= 0) {
+                drag.accepted = false;
+            }
+        }
+
+        onPositionChanged: drag => {
+            const pos = mapToItem(list.contentItem, drag.x, drag.y);
+            const index = list.indexAt(pos.x, pos.y);
+            if (index !== list.dropHoverIndex) {
+                list.dropHoverIndex = index;
+                if (index >= 0) {
+                    activationTimer.restart();
+                } else {
+                    activationTimer.stop();
+                }
+            }
+        }
+
+        onExited: {
+            list.dropHoverIndex = -1;
+            activationTimer.stop();
+        }
+
+        onDropped: drop => {
+            list.dropHoverIndex = -1;
+            activationTimer.stop();
+            drop.accepted = false;
+        }
+
+        Timer {
+            id: activationTimer
+
+            interval: 250
+            onTriggered: {
+                if (list.dropHoverIndex >= 0) {
+                    windowModel.activate(list.dropHoverIndex);
                 }
             }
         }

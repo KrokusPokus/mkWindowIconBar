@@ -16,6 +16,7 @@
 #include <QDBusMessage>
 #include <QDBusPendingCallWatcher>
 #include <QDBusPendingReply>
+#include <QDBusArgument>
 #include <QDBusServiceWatcher>
 #include <QDBusVariant>
 #include <QDataStream>
@@ -327,15 +328,17 @@ WindowModel::WindowModel(QObject *parent)
         });
     });
 
-    // The current virtual desktop comes from KWin over D-Bus: its change signal, and the value read at start.
-    // The signal connection survives a restart of KWin's service; the value is read again when it appears
-    // (also if it was not there yet at start).
+    // The current virtual desktop and the list of desktops come from KWin over D-Bus: change signals, and the
+    // values read at start. The signal connections survive a restart of KWin's service; the values are read
+    // again when it appears (also if it was not there yet at start).
     QDBusConnection bus = QDBusConnection::sessionBus();
     bus.connect(kKWinService, kVirtualDesktopPath, kVirtualDesktopInterface, QStringLiteral("currentChanged"),
                 this, SLOT(setCurrentVirtualDesktop(QString)));
+    bus.connect(kKWinService, kVirtualDesktopPath, QStringLiteral("org.freedesktop.DBus.Properties"), QStringLiteral("PropertiesChanged"),
+                this, SLOT(onVirtualDesktopPropertiesChanged(QString, QVariantMap, QStringList)));
     auto *serviceWatcher = new QDBusServiceWatcher(kKWinService, bus, QDBusServiceWatcher::WatchForRegistration, this);
-    connect(serviceWatcher, &QDBusServiceWatcher::serviceRegistered, this, &WindowModel::fetchCurrentVirtualDesktop);
-    fetchCurrentVirtualDesktop();
+    connect(serviceWatcher, &QDBusServiceWatcher::serviceRegistered, this, &WindowModel::fetchVirtualDesktops);
+    fetchVirtualDesktops();
 
     // A window can move to another screen because the screens change
     auto onScreensChanged = [this] {
@@ -347,19 +350,64 @@ WindowModel::WindowModel(QObject *parent)
     connect(qGuiApp, &QGuiApplication::screenRemoved, this, onScreensChanged);
 }
 
-void WindowModel::fetchCurrentVirtualDesktop()
+void WindowModel::fetchVirtualDesktops()
 {
     QDBusMessage message = QDBusMessage::createMethodCall(kKWinService, kVirtualDesktopPath,
-                                                          QStringLiteral("org.freedesktop.DBus.Properties"), QStringLiteral("Get"));
-    message << kVirtualDesktopInterface << QStringLiteral("current");
+                                                          QStringLiteral("org.freedesktop.DBus.Properties"), QStringLiteral("GetAll"));
+    message << kVirtualDesktopInterface;
     auto *watcher = new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(message), this);
     connect(watcher, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *call) {
-        const QDBusPendingReply<QDBusVariant> reply = *call;
+        const QDBusPendingReply<QVariantMap> reply = *call;
         if (reply.isValid()) {
-            setCurrentVirtualDesktop(reply.value().variant().toString());
+            onVirtualDesktopPropertiesChanged(kVirtualDesktopInterface, reply.value(), {});
         }
         call->deleteLater();
     });
+}
+
+void WindowModel::onVirtualDesktopPropertiesChanged(const QString &interface, const QVariantMap &changed, const QStringList &invalidated)
+{
+    Q_UNUSED(invalidated)
+    if (interface != kVirtualDesktopInterface) {
+        return;
+    }
+    if (const auto it = changed.constFind(QStringLiteral("current")); it != changed.constEnd()) {
+        setCurrentVirtualDesktop(it->toString());
+    }
+    if (const auto it = changed.constFind(QStringLiteral("desktops")); it != changed.constEnd()) {
+        setVirtualDesktopsFromDBus(*it);
+    }
+}
+
+void WindowModel::setVirtualDesktopsFromDBus(const QVariant &value)
+{
+    if (!value.canConvert<QDBusArgument>()) {
+        return;
+    }
+    // a(uss): position, id, name
+    const QDBusArgument argument = value.value<QDBusArgument>();
+    QList<std::pair<uint, QVariantMap>> desktops;
+    argument.beginArray();
+    while (!argument.atEnd()) {
+        uint position = 0;
+        QString id;
+        QString name;
+        argument.beginStructure();
+        argument >> position >> id >> name;
+        argument.endStructure();
+        desktops.append({position, QVariantMap{{QStringLiteral("id"), id}, {QStringLiteral("name"), name}}});
+    }
+    argument.endArray();
+    std::ranges::stable_sort(desktops, {}, &std::pair<uint, QVariantMap>::first);
+
+    QVariantList list;
+    for (const auto &desktop : std::as_const(desktops)) {
+        list.append(desktop.second);
+    }
+    if (list != m_virtualDesktops) {
+        m_virtualDesktops = list;
+        Q_EMIT virtualDesktopsChanged();
+    }
 }
 
 WindowModel::~WindowModel()
@@ -430,7 +478,18 @@ void WindowModel::setCurrentVirtualDesktop(const QString &id)
         if (m_filterByVirtualDesktop) {
             refilter();
         }
+        Q_EMIT currentVirtualDesktopChanged();
     }
+}
+
+QVariantList WindowModel::virtualDesktops() const
+{
+    return m_virtualDesktops;
+}
+
+QString WindowModel::currentVirtualDesktop() const
+{
+    return m_currentVirtualDesktop;
 }
 
 QHash<int, QByteArray> WindowModel::roleNames() const
@@ -440,6 +499,14 @@ QHash<int, QByteArray> WindowModel::roleNames() const
     roles.insert(IsMinimized, QByteArrayLiteral("IsMinimized"));
     roles.insert(IsDemandingAttention, QByteArrayLiteral("IsDemandingAttention"));
     roles.insert(IsClosable, QByteArrayLiteral("IsClosable"));
+    roles.insert(IsMinimizable, QByteArrayLiteral("IsMinimizable"));
+    roles.insert(IsMaximized, QByteArrayLiteral("IsMaximized"));
+    roles.insert(IsMaximizable, QByteArrayLiteral("IsMaximizable"));
+    roles.insert(IsKeepAbove, QByteArrayLiteral("IsKeepAbove"));
+    roles.insert(VirtualDesktops, QByteArrayLiteral("VirtualDesktops"));
+    roles.insert(IsOnAllVirtualDesktops, QByteArrayLiteral("IsOnAllVirtualDesktops"));
+    roles.insert(IsVirtualDesktopsChangeable, QByteArrayLiteral("IsVirtualDesktopsChangeable"));
+    roles.insert(ScreenGeometry, QByteArrayLiteral("ScreenGeometry"));
     roles.insert(AppId, QByteArrayLiteral("AppId"));
     return roles;
 }
@@ -469,6 +536,22 @@ QVariant WindowModel::data(const QModelIndex &index, int role) const
         return isDemandingAttention(window);
     case IsClosable:
         return window->hasState(State::state_closeable);
+    case IsMinimizable:
+        return window->hasState(State::state_minimizable);
+    case IsMaximized:
+        return window->hasState(State::state_maximized);
+    case IsMaximizable:
+        return window->hasState(State::state_maximizable);
+    case IsKeepAbove:
+        return window->hasState(State::state_keep_above);
+    case VirtualDesktops:
+        return QStringList(window->virtualDesktops);
+    case IsOnAllVirtualDesktops:
+        return window->hasState(State::state_on_all_desktops) || window->virtualDesktops.isEmpty();
+    case IsVirtualDesktopsChangeable:
+        return window->hasState(State::state_virtual_desktop_changeable);
+    case ScreenGeometry:
+        return screenGeometryAt(window->geometry.center());
     case AppId:
         return window->appId;
     default:
@@ -495,15 +578,17 @@ void WindowModel::addWindow(PlasmaWindow *window)
     connect(window, &PlasmaWindow::appIdChanged, this, [this, window] {
         emitChanged(window, {AppId});
     });
-    connect(window, &PlasmaWindow::geometryChanged, this, [this] {
+    connect(window, &PlasmaWindow::geometryChanged, this, [this, window] {
         if (m_filterByScreen) {
             refilter();
         }
+        emitChanged(window, {ScreenGeometry});
     });
-    connect(window, &PlasmaWindow::virtualDesktopsChanged, this, [this] {
+    connect(window, &PlasmaWindow::virtualDesktopsChanged, this, [this, window] {
         if (m_filterByVirtualDesktop) {
             refilter();
         }
+        emitChanged(window, {VirtualDesktops, IsOnAllVirtualDesktops});
     });
     connect(window, &PlasmaWindow::stateChanged, this, [this, window](uint32_t changed) {
         // On all desktops and demanding attention matter for the virtual desktop filter
@@ -515,6 +600,24 @@ void WindowModel::addWindow(PlasmaWindow *window)
         }
         if (changed & State::state_closeable) {
             emitChanged(window, {IsClosable});
+        }
+        if (changed & State::state_minimizable) {
+            emitChanged(window, {IsMinimizable});
+        }
+        if (changed & State::state_maximized) {
+            emitChanged(window, {IsMaximized});
+        }
+        if (changed & State::state_maximizable) {
+            emitChanged(window, {IsMaximizable});
+        }
+        if (changed & State::state_keep_above) {
+            emitChanged(window, {IsKeepAbove});
+        }
+        if (changed & State::state_on_all_desktops) {
+            emitChanged(window, {IsOnAllVirtualDesktops});
+        }
+        if (changed & State::state_virtual_desktop_changeable) {
+            emitChanged(window, {IsVirtualDesktopsChangeable});
         }
         // Activity and attention of a transient are shown at its leader
         if (changed & State::state_active) {
@@ -681,6 +784,15 @@ void WindowModel::activateOrMinimize(int row)
         }
         return;
     }
+    activate(row);
+}
+
+void WindowModel::activate(int row)
+{
+    if (row < 0 || row >= count()) {
+        return;
+    }
+    PlasmaWindow *window = m_rows.at(row);
 
     // Which window of the group (the window and its transients, e.g. dialogs) gets the focus:
     // - a transient demanding attention (e.g. a dialog asking something),
@@ -735,6 +847,94 @@ void WindowModel::move(int from, int to)
     m_windows.insert(to > from ? it + 1 : it, window);
 
     endMoveRows();
+}
+
+WindowModel::PlasmaWindow *WindowModel::windowAt(int row) const
+{
+    return (row >= 0 && row < count()) ? m_rows.at(row) : nullptr;
+}
+
+// The window actions of the context menu, as in libtaskmanager's WaylandTasksModel
+
+void WindowModel::toggleMinimized(int row)
+{
+    if (PlasmaWindow *window = windowAt(row)) {
+        const bool minimized = window->hasState(State::state_minimized);
+        window->set_state(State::state_minimized, minimized ? 0 : State::state_minimized);
+    }
+}
+
+void WindowModel::toggleMaximized(int row)
+{
+    if (PlasmaWindow *window = windowAt(row)) {
+        // Activated as well: maximizing a window in the background would be confusing
+        const bool maximized = window->hasState(State::state_maximized);
+        window->set_state(State::state_maximized | State::state_active,
+                          maximized ? State::state_active : State::state_maximized | State::state_active);
+    }
+}
+
+void WindowModel::toggleKeepAbove(int row)
+{
+    if (PlasmaWindow *window = windowAt(row)) {
+        const bool keepAbove = window->hasState(State::state_keep_above);
+        window->set_state(State::state_keep_above, keepAbove ? 0 : State::state_keep_above);
+    }
+}
+
+void WindowModel::moveToVirtualDesktop(int row, const QString &desktopId)
+{
+    PlasmaWindow *window = windowAt(row);
+    if (!window || desktopId.isEmpty()) {
+        return;
+    }
+    // Enter the new one first: a window on no desktop at all counts as on all desktops
+    const QList<QString> current = window->virtualDesktops;
+    if (!current.contains(desktopId)) {
+        window->request_enter_virtual_desktop(desktopId);
+    }
+    for (const QString &desktop : current) {
+        if (desktop != desktopId) {
+            window->request_leave_virtual_desktop(desktop);
+        }
+    }
+}
+
+void WindowModel::setOnAllVirtualDesktops(int row)
+{
+    if (PlasmaWindow *window = windowAt(row)) {
+        // On no desktop is on all desktops
+        const QList<QString> current = window->virtualDesktops;
+        for (const QString &desktop : current) {
+            window->request_leave_virtual_desktop(desktop);
+        }
+    }
+}
+
+void WindowModel::moveToNewVirtualDesktop(int row)
+{
+    if (PlasmaWindow *window = windowAt(row)) {
+        window->request_enter_new_virtual_desktop();
+    }
+}
+
+void WindowModel::sendToScreen(int row, const QString &screenName)
+{
+    PlasmaWindow *window = windowAt(row);
+    if (!window) {
+        return;
+    }
+    const QList<QScreen *> screens = QGuiApplication::screens();
+    for (QScreen *screen : screens) {
+        if (screen->name() != screenName) {
+            continue;
+        }
+        auto *waylandScreen = screen->nativeInterface<QNativeInterface::QWaylandScreen>();
+        if (waylandScreen && waylandScreen->output()) {
+            window->send_to_output(waylandScreen->output());
+        }
+        return;
+    }
 }
 
 void WindowModel::publishGeometry(int row, QQuickItem *item)

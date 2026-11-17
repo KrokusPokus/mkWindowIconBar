@@ -32,3 +32,20 @@ msgstr "Nur aktueller virtueller Desktop"
 msgctxt "@option:check"
 msgid "Only the current screen"
 msgstr "Nur aktueller Bildschirm"
+
+#: qml/WindowButton.qml
+msgctxt "action:inmenu"
+msgid "Move to &Screen"
+msgstr "Auf &Bildschirm verschieben"
+
+#: qml/WindowButton.qml
+msgctxt "@item:inmenu List of all Screens to send a window to."
+msgid "Built-in Screen"
+msgstr "Eingebauter Bildschirm"
+
+#: qml/WindowButton.qml
+msgctxt ""
+"@item:inmenu List of all Screens to send a window to, manufacturer, model "
+"(output identifier)"
+msgid "%1 %2 (%3)"
+msgstr "%1 %2 (%3)"

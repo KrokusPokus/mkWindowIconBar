@@ -26,7 +26,7 @@ icon.
 * Left click: activate the window, or minimize it if it is the active one
 * Middle click: close the window
 * Tooltip with the window title
-* Context menu with *Close*
+* Context menu: move to another virtual desktop or screen, minimize, maximize, keep above others, close
 * Options: only the windows of the current virtual desktop, only the windows of the current screen
 * Reordering by drag and drop
 * Highlighting of the active window, minimized windows and windows demanding attention,

@@ -55,6 +55,72 @@ Item {
         windowModel.activateOrMinimize(index);
     }
 
+    // Texts that the task manager already has are taken from its translations
+    readonly property string taskManagerDomain: "plasma_applet_org.kde.plasma.taskmanager"
+
+    function newMenuItem(menu: QtObject): PlasmaExtras.MenuItem {
+        return Qt.createQmlObject("import org.kde.plasma.extras as PlasmaExtras\nPlasmaExtras.MenuItem {}", menu) as PlasmaExtras.MenuItem;
+    }
+
+    function newMenuSeparator(menu: QtObject): void {
+        Qt.createQmlObject("import org.kde.plasma.extras as PlasmaExtras\nPlasmaExtras.MenuItem { separator: true }", menu);
+    }
+
+    // "Move to Desktop" submenu, as in ContextMenu.qml of the task manager. Filled when the context menu is
+    // created; the context menu exists only while it is open.
+    function fillDesktopsMenu(menu: QtObject): void {
+        const desktops = windowModel.virtualDesktops;
+        const current = windowModel.currentVirtualDesktop;
+        const onDesktops = model.VirtualDesktops;
+        const onAll = model.IsOnAllVirtualDesktops;
+
+        let item = newMenuItem(menu);
+        item.text = i18ndc(taskManagerDomain, "action:inmenu", "Move &To Current Desktop");
+        item.enabled = current !== "" && onDesktops.indexOf(current) < 0;
+        item.clicked.connect(() => windowModel.moveToVirtualDesktop(button.index, current));
+
+        item = newMenuItem(menu);
+        item.text = i18ndc(taskManagerDomain, "action:inmenu", "&All Desktops");
+        item.checkable = true;
+        item.checked = onAll;
+        item.clicked.connect(() => windowModel.setOnAllVirtualDesktops(button.index));
+
+        newMenuSeparator(menu);
+
+        for (const desktop of desktops) {
+            item = newMenuItem(menu);
+            item.text = desktop.name;
+            item.checkable = true;
+            item.checked = !onAll && onDesktops.indexOf(desktop.id) >= 0;
+            item.clicked.connect(() => windowModel.moveToVirtualDesktop(button.index, desktop.id));
+        }
+
+        newMenuSeparator(menu);
+
+        item = newMenuItem(menu);
+        item.text = i18ndc(taskManagerDomain, "action:inmenu", "&New Desktop");
+        item.icon = "list-add";
+        item.clicked.connect(() => windowModel.moveToNewVirtualDesktop(button.index));
+    }
+
+    // "Move to Screen" submenu, as in ContextMenu.qml of the task manager (newer than Plasma 6.8)
+    function fillScreensMenu(menu: QtObject): void {
+        const windowScreen = model.ScreenGeometry;
+        for (const screen of Qt.application.screens) {
+            const item = newMenuItem(menu);
+            const builtIn = screen.name.startsWith("eDP-") || screen.name.startsWith("LVDS-") || screen.name.startsWith("DSI-");
+            item.text = builtIn
+                ? i18nc("@item:inmenu List of all Screens to send a window to.", "Built-in Screen")
+                : i18nc("@item:inmenu List of all Screens to send a window to, manufacturer, model (output identifier)",
+                        "%1 %2 (%3)", screen.manufacturer, screen.model, screen.name);
+            item.checkable = true;
+            item.checked = windowScreen.x === screen.virtualX && windowScreen.y === screen.virtualY
+                && windowScreen.width === screen.width && windowScreen.height === screen.height;
+            const name = screen.name;
+            item.clicked.connect(() => windowModel.sendToScreen(button.index, name));
+        }
+    }
+
     function showContextMenu(): void {
         const menu = contextMenuComponent.createObject(button) as PlasmaExtras.Menu;
         menu.openRelative();
@@ -73,7 +139,7 @@ Item {
     Accessible.name: model.display
     // The translation of the task manager is used ("%1 aktivieren")
     Accessible.description: model.display
-        ? i18ndc("plasma_applet_org.kde.plasma.taskmanager", "@info:usagetip %1 task name", "Activate %1", model.display)
+        ? i18ndc(taskManagerDomain, "@info:usagetip %1 task name", "Activate %1", model.display)
         : ""
     Accessible.onPressAction: activate()
 
@@ -99,8 +165,9 @@ Item {
     Keys.onUpPressed: event => Keys.leftPressed(event)
     Keys.onDownPressed: event => Keys.rightPressed(event)
 
-    // Hover frame also for the keyboard focus, so that it can be seen which button Return activates
-    readonly property bool highlighted: mouseArea.containsMouse || activeFocus
+    // Hover frame also for the keyboard focus, so that it can be seen which button Return activates, and for
+    // something dragged from outside over the button (its window comes to the front)
+    readonly property bool highlighted: mouseArea.containsMouse || activeFocus || listView.dropHoverIndex === index
 
     function publishGeometry(): void {
         windowModel.publishGeometry(index, button);
@@ -176,6 +243,80 @@ Item {
                 }
             }
 
+            // Window actions, as in ContextMenu.qml of the task manager (there partly in a "More" submenu)
+            PlasmaExtras.MenuItem {
+                id: desktopsMenuItem
+
+                visible: button.windowModel.virtualDesktops.length > 1 && button.model.IsVirtualDesktopsChangeable
+                enabled: visible
+                text: i18ndc(button.taskManagerDomain, "action:inmenu", "Move to &Desktop")
+                icon: "virtual-desktops"
+
+                readonly property PlasmaExtras.Menu desktopsMenu: PlasmaExtras.Menu {
+                    visualParent: desktopsMenuItem.action
+                }
+
+                Component.onCompleted: {
+                    if (visible) {
+                        button.fillDesktopsMenu(desktopsMenu);
+                    }
+                }
+            }
+
+            PlasmaExtras.MenuItem {
+                id: screensMenuItem
+
+                visible: Qt.application.screens.length > 1
+                enabled: visible
+                text: i18nc("action:inmenu", "Move to &Screen")
+                icon: "computer"
+
+                readonly property PlasmaExtras.Menu screensMenu: PlasmaExtras.Menu {
+                    visualParent: screensMenuItem.action
+                }
+
+                Component.onCompleted: {
+                    if (visible) {
+                        button.fillScreensMenu(screensMenu);
+                    }
+                }
+            }
+
+            PlasmaExtras.MenuItem {
+                separator: true
+                visible: desktopsMenuItem.visible || screensMenuItem.visible
+            }
+
+            PlasmaExtras.MenuItem {
+                enabled: button.model.IsMinimizable
+                checkable: true
+                checked: button.model.IsMinimized
+                text: i18ndc(button.taskManagerDomain, "action:inmenu", "Mi&nimize")
+                icon: "window-minimize"
+                onClicked: button.windowModel.toggleMinimized(button.index)
+            }
+
+            PlasmaExtras.MenuItem {
+                enabled: button.model.IsMaximizable
+                checkable: true
+                checked: button.model.IsMaximized
+                text: i18ndc(button.taskManagerDomain, "action:inmenu", "Ma&ximize")
+                icon: "window-maximize"
+                onClicked: button.windowModel.toggleMaximized(button.index)
+            }
+
+            PlasmaExtras.MenuItem {
+                checkable: true
+                checked: button.model.IsKeepAbove
+                text: i18ndc(button.taskManagerDomain, "action:inmenu", "Keep &Above Others")
+                icon: "window-keep-above"
+                onClicked: button.windowModel.toggleKeepAbove(button.index)
+            }
+
+            PlasmaExtras.MenuItem {
+                separator: true
+            }
+
             // The right click is taken by this menu, so it has to offer what the default menu of an applet
             // offers: configure this widget, configure the panel (as ContextMenu.qml of the task manager does)
             PlasmaExtras.MenuItem {
@@ -207,8 +348,7 @@ Item {
             }
 
             PlasmaExtras.MenuItem {
-                // The translation of the task manager is used ("&Schließen")
-                text: i18ndc("plasma_applet_org.kde.plasma.taskmanager", "@action:inmenu", "&Close")
+                text: i18ndc(button.taskManagerDomain, "@action:inmenu", "&Close")
                 icon: "window-close"
                 enabled: button.model.IsClosable
                 onClicked: button.windowModel.close(button.index)
