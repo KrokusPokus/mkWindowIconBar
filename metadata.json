@@ -12,8 +12,8 @@
         "Icon": "preferences-system-windows",
         "Id": "io.github.krokuspokus.windowswitcher",
         "License": "GPL-2.0-or-later",
-        "Name": "Window Switcher",
-        "Name[de]": "Fensterumschalter",
+        "Name": "Window Icon Bar",
+        "Name[de]": "Fensterleiste mit Fenstersymbolen",
         "Version": "0.1.0",
         "Website": "https://github.com/KrokusPokus/mkWindowSwitcher"
     },

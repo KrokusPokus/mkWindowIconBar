@@ -26,6 +26,8 @@ icon.
 * Left click: activate the window, or minimize it if it is the active one
 * Middle click: close the window
 * Tooltip with the window title
+* Context menu with *Close*
+* Reordering by drag and drop
 * Highlighting of the active window, minimized windows and windows demanding attention,
   drawn with the task bar graphics of the Plasma theme
 * Minimize animation towards the window's icon
@@ -53,7 +55,7 @@ sudo pacman -S --needed cmake extra-cmake-modules qt6-base qt6-declarative qt6-w
 ./install.sh --uninstall  # removes the installed files again
 ```
 
-Then edit the panel, choose *Add Widgets…*, and drag *Window Switcher* into the panel.
+Then edit the panel, choose *Add Widgets…*, and drag *Window Icon Bar* (German: *Fensterleiste mit Fenstersymbolen*) into the panel.
 The original task manager can be removed afterwards.
 
 Plasma loads applet plugins only at startup: after installing a new version,

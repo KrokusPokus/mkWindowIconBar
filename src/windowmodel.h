@@ -39,6 +39,7 @@ public:
         IsActive = Qt::UserRole + 1,
         IsMinimized,
         IsDemandingAttention,
+        IsClosable,
         AppId,
     };
     Q_ENUM(Roles)
@@ -55,6 +56,8 @@ public:
     // Activates the window, or minimizes it if it already is the active one.
     Q_INVOKABLE void activateOrMinimize(int row);
     Q_INVOKABLE void close(int row);
+    // Moves a window to another place in the bar (drag and drop)
+    Q_INVOKABLE void move(int from, int to);
     // Tells KWin where the button of the window is (target of the minimize animation).
     Q_INVOKABLE void publishGeometry(int row, QQuickItem *item);
 

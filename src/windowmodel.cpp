@@ -282,6 +282,7 @@ QHash<int, QByteArray> WindowModel::roleNames() const
     roles.insert(IsActive, QByteArrayLiteral("IsActive"));
     roles.insert(IsMinimized, QByteArrayLiteral("IsMinimized"));
     roles.insert(IsDemandingAttention, QByteArrayLiteral("IsDemandingAttention"));
+    roles.insert(IsClosable, QByteArrayLiteral("IsClosable"));
     roles.insert(AppId, QByteArrayLiteral("AppId"));
     return roles;
 }
@@ -305,6 +306,8 @@ QVariant WindowModel::data(const QModelIndex &index, int role) const
         return window->hasState(State::state_minimized);
     case IsDemandingAttention:
         return isDemandingAttention(window);
+    case IsClosable:
+        return window->hasState(State::state_closeable);
     case AppId:
         return window->appId;
     default:
@@ -334,6 +337,9 @@ void WindowModel::addWindow(PlasmaWindow *window)
         }
         if (changed & State::state_minimized) {
             emitChanged(window, {IsMinimized});
+        }
+        if (changed & State::state_closeable) {
+            emitChanged(window, {IsClosable});
         }
         // Activity and attention of a transient are shown at its leader
         if (changed & State::state_active) {
@@ -482,6 +488,21 @@ void WindowModel::close(int row)
         return;
     }
     m_rows.at(row)->close();
+}
+
+void WindowModel::move(int from, int to)
+{
+    if (from == to || from < 0 || from >= count() || to < 0 || to >= count()) {
+        return;
+    }
+    // beginMoveRows() wants the row in front of which the moved row ends up, counted before the move
+    if (!beginMoveRows(QModelIndex(), from, from, QModelIndex(), to > from ? to + 1 : to)) {
+        return;
+    }
+    PlasmaWindow *window = m_rows.at(from);
+    m_rows.erase(m_rows.begin() + from);
+    m_rows.insert(m_rows.begin() + to, window);
+    endMoveRows();
 }
 
 void WindowModel::publishGeometry(int row, QQuickItem *item)
