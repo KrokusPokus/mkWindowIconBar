@@ -184,7 +184,9 @@ PlasmaCore.ToolTipArea {
 
     // Hover frame also for the keyboard focus, so that it can be seen which button Return activates, and for
     // something dragged from outside over the button (its window comes to the front)
-    readonly property bool highlighted: mouseArea.containsMouse || activeFocus || listView.dropHoverIndex === index
+    // No hover frame while the button is dragged, as in the task manager (there the system drag takes the mouse):
+    // the button slides behind the mouse, the mouse leaves and enters it, and the frame would flicker.
+    readonly property bool highlighted: (mouseArea.containsMouse && !mouseArea.dragging) || activeFocus || listView.dropHoverIndex === index
 
     // The dragged button stays in front of the others, which slide aside below it, until its own slide into
     // the last place is over (the move transition of the list, shortDuration)
