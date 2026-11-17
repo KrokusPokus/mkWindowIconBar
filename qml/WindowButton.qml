@@ -1,7 +1,12 @@
 /*
+    SPDX-FileCopyrightText: 2012-2016 Eike Hein <hein@kde.org>
+    SPDX-FileCopyrightText: 2020 Nate Graham <nate@kde.org>
     SPDX-FileCopyrightText: 2026 KrokusPokus
 
     SPDX-License-Identifier: GPL-2.0-or-later
+
+    The theme prefixes of the button frame (edgePrefix()) follow taskPrefix() / taskPrefixHovered()
+    of plasma-desktop/applets/taskmanager/qml/code/TaskTools.js.
 */
 pragma ComponentBehavior: Bound
 
