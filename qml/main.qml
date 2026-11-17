@@ -95,7 +95,15 @@ PlasmoidItem {
         highlightFollowsCurrentItem: false
         reuseItems: false
 
-        // The other buttons slide aside while one is dragged
+        // While a button is dragged, it slides to its new place (move) and the others slide aside
+        // (moveDisplaced), as in the task manager
+        move: Transition {
+            NumberAnimation {
+                properties: "x,y"
+                duration: Kirigami.Units.shortDuration
+                easing.type: Easing.OutQuad
+            }
+        }
         moveDisplaced: Transition {
             NumberAnimation {
                 properties: "x,y"
