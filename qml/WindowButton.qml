@@ -186,6 +186,15 @@ PlasmaCore.ToolTipArea {
     // something dragged from outside over the button (its window comes to the front)
     readonly property bool highlighted: mouseArea.containsMouse || activeFocus || listView.dropHoverIndex === index
 
+    // The dragged button stays in front of the others, which slide aside below it, until its own slide into
+    // the last place is over (the move transition of the list, shortDuration)
+    z: mouseArea.dragging || raiseTimer.running ? 1 : 0
+
+    Timer {
+        id: raiseTimer
+        interval: Kirigami.Units.shortDuration
+    }
+
     function publishGeometry(): void {
         windowModel.publishGeometry(index, button);
     }
@@ -413,6 +422,14 @@ PlasmaCore.ToolTipArea {
 
         onReleased: {
             button.listView.dragging = false;
+            if (dragging) {
+                raiseTimer.restart();
+            }
+            // After onClicked, which follows right away and must still see that it was a drag. Released
+            // outside of the button there is no onClicked.
+            Qt.callLater(() => {
+                dragging = false;
+            });
         }
 
         onCanceled: {
