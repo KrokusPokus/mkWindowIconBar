@@ -1,0 +1,21 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "KrokusPokus"
+            }
+        ],
+        "Category": "Windows and Tasks",
+        "Description": "Shows every open window as an icon and switches to it on click. The icon is the one the window sets itself.",
+        "Description[de]": "Zeigt jedes offene Fenster als Symbol und wechselt per Klick dorthin. Das Symbol ist das, welches das Fenster selbst setzt.",
+        "Icon": "preferences-system-windows",
+        "Id": "io.github.krokuspokus.windowswitcher",
+        "License": "GPL-2.0-or-later",
+        "Name": "Window Switcher",
+        "Name[de]": "Fensterumschalter",
+        "Version": "0.1.0",
+        "Website": "https://github.com/KrokusPokus/mkWindowSwitcher"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}
