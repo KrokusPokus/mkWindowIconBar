@@ -54,6 +54,10 @@ PlasmoidItem {
 
     WindowSwitcher.WindowModel {
         id: windowModel
+
+        filterByScreen: Plasmoid.configuration.showOnlyCurrentScreen
+        screenGeometry: Plasmoid.containment.screenGeometry
+        filterByVirtualDesktop: Plasmoid.configuration.showOnlyCurrentDesktop
     }
 
     // Only for the margins of the task frame (the task manager does the same)

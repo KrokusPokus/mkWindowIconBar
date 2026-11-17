@@ -22,10 +22,18 @@ if [ "$1" = "--uninstall" ]; then
         echo "build/install_manifest.txt not found: nothing was installed from this build directory." >&2
         exit 1
     fi
+    # Only files: the manifest also lists directories like /usr/share/locale, which belong to the system
     echo "Removing:"
-    cat build/install_manifest.txt
-    echo
-    xargs -d '\n' sudo rm -f -- < build/install_manifest.txt
+    files=()
+    while IFS= read -r file; do
+        if [ -n "$file" ] && [ ! -d "$file" ]; then
+            files+=("$file")
+            echo "  $file"
+        fi
+    done < build/install_manifest.txt
+    if [ ${#files[@]} -gt 0 ]; then
+        sudo rm -f -- "${files[@]}"
+    fi
     restart_plasmashell
     exit 0
 fi

@@ -27,6 +27,7 @@ icon.
 * Middle click: close the window
 * Tooltip with the window title
 * Context menu with *Close*
+* Options: only the windows of the current virtual desktop, only the windows of the current screen
 * Reordering by drag and drop
 * Highlighting of the active window, minimized windows and windows demanding attention,
   drawn with the task bar graphics of the Plasma theme

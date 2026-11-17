@@ -12,13 +12,20 @@
 
 #include <qwayland-plasma-window-management.h>
 
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusPendingCallWatcher>
+#include <QDBusPendingReply>
+#include <QDBusVariant>
 #include <QDataStream>
 #include <QFuture>
 #include <QFutureWatcher>
+#include <QGuiApplication>
 #include <QIcon>
 #include <QPointer>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QScreen>
 #include <QWaylandClientExtension>
 #include <QtConcurrentRun>
 #include <qpa/qplatformwindow_p.h>
@@ -54,6 +61,8 @@ public:
     QString appId;
     QIcon icon;
     QFlags<state> windowState;
+    QRect geometry;
+    QList<QString> virtualDesktops; // empty: on all virtual desktops
     QPointer<PlasmaWindow> parentWindow;
     bool wasUnmapped = false;
 
@@ -69,6 +78,8 @@ Q_SIGNALS:
     void appIdChanged();
     void iconChanged();
     void stateChanged(uint32_t changedFlags);
+    void geometryChanged();
+    void virtualDesktopsChanged();
     void parentWindowChanged();
 
 protected:
@@ -156,6 +167,21 @@ protected:
             Q_EMIT stateChanged(changed);
         }
     }
+    void org_kde_plasma_window_geometry(int32_t x, int32_t y, uint32_t width, uint32_t height) override
+    {
+        geometry = QRect(x, y, width, height);
+        Q_EMIT geometryChanged();
+    }
+    void org_kde_plasma_window_virtual_desktop_entered(const QString &id) override
+    {
+        virtualDesktops.push_back(id);
+        Q_EMIT virtualDesktopsChanged();
+    }
+    void org_kde_plasma_window_virtual_desktop_left(const QString &id) override
+    {
+        virtualDesktops.removeAll(id);
+        Q_EMIT virtualDesktopsChanged();
+    }
     void org_kde_plasma_window_parent_window(::org_kde_plasma_window *parent) override
     {
         PlasmaWindow *parentWindow = nullptr;
@@ -238,6 +264,47 @@ using WindowSwitcher::PlasmaWindow;
 using WindowSwitcher::PlasmaWindowManagement;
 using State = PlasmaWindow::state;
 
+namespace
+{
+
+const QString kKWinService = QStringLiteral("org.kde.KWin");
+const QString kVirtualDesktopPath = QStringLiteral("/VirtualDesktopManager");
+const QString kVirtualDesktopInterface = QStringLiteral("org.kde.KWin.VirtualDesktopManager");
+
+// Geometry of the screen a point is on, or of the nearest screen (from libtaskmanager's tasktools.cpp)
+QRect screenGeometryAt(const QPoint &pos)
+{
+    if (pos.isNull()) {
+        return {};
+    }
+
+    const QList<QScreen *> &screens = QGuiApplication::screens();
+    QRect screenGeometry;
+    int shortestDistance = INT_MAX;
+
+    for (const QScreen *screen : screens) {
+        const QRect &geometry = screen->geometry();
+
+        if (geometry.contains(pos)) {
+            return geometry;
+        }
+
+        int distance = QPoint(geometry.topLeft() - pos).manhattanLength();
+        distance = qMin(distance, QPoint(geometry.topRight() - pos).manhattanLength());
+        distance = qMin(distance, QPoint(geometry.bottomRight() - pos).manhattanLength());
+        distance = qMin(distance, QPoint(geometry.bottomLeft() - pos).manhattanLength());
+
+        if (distance < shortestDistance) {
+            shortestDistance = distance;
+            screenGeometry = geometry;
+        }
+    }
+
+    return screenGeometry;
+}
+
+} // namespace
+
 WindowModel::WindowModel(QObject *parent)
     : QAbstractListModel(parent)
     , m_management(std::make_unique<PlasmaWindowManagement>())
@@ -257,6 +324,31 @@ WindowModel::WindowModel(QObject *parent)
             removeWindow(window);
         });
     });
+
+    // The current virtual desktop comes from KWin over D-Bus: its change signal, and the initial value read once
+    QDBusConnection bus = QDBusConnection::sessionBus();
+    bus.connect(kKWinService, kVirtualDesktopPath, kVirtualDesktopInterface, QStringLiteral("currentChanged"),
+                this, SLOT(setCurrentVirtualDesktop(QString)));
+    QDBusMessage message = QDBusMessage::createMethodCall(kKWinService, kVirtualDesktopPath,
+                                                          QStringLiteral("org.freedesktop.DBus.Properties"), QStringLiteral("Get"));
+    message << kVirtualDesktopInterface << QStringLiteral("current");
+    auto *watcher = new QDBusPendingCallWatcher(bus.asyncCall(message), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *call) {
+        const QDBusPendingReply<QDBusVariant> reply = *call;
+        if (reply.isValid()) {
+            setCurrentVirtualDesktop(reply.value().variant().toString());
+        }
+        call->deleteLater();
+    });
+
+    // A window can move to another screen because the screens change
+    auto onScreensChanged = [this] {
+        if (m_filterByScreen) {
+            refilter();
+        }
+    };
+    connect(qGuiApp, &QGuiApplication::screenAdded, this, onScreensChanged);
+    connect(qGuiApp, &QGuiApplication::screenRemoved, this, onScreensChanged);
 }
 
 WindowModel::~WindowModel()
@@ -274,6 +366,60 @@ int WindowModel::rowCount(const QModelIndex &parent) const
 int WindowModel::count() const
 {
     return static_cast<int>(m_rows.size());
+}
+
+bool WindowModel::filterByScreen() const
+{
+    return m_filterByScreen;
+}
+
+void WindowModel::setFilterByScreen(bool filter)
+{
+    if (m_filterByScreen != filter) {
+        m_filterByScreen = filter;
+        refilter();
+        Q_EMIT filterByScreenChanged();
+    }
+}
+
+QRect WindowModel::screenGeometry() const
+{
+    return m_screenGeometry;
+}
+
+void WindowModel::setScreenGeometry(const QRect &geometry)
+{
+    if (m_screenGeometry != geometry) {
+        m_screenGeometry = geometry;
+        if (m_filterByScreen) {
+            refilter();
+        }
+        Q_EMIT screenGeometryChanged();
+    }
+}
+
+bool WindowModel::filterByVirtualDesktop() const
+{
+    return m_filterByVirtualDesktop;
+}
+
+void WindowModel::setFilterByVirtualDesktop(bool filter)
+{
+    if (m_filterByVirtualDesktop != filter) {
+        m_filterByVirtualDesktop = filter;
+        refilter();
+        Q_EMIT filterByVirtualDesktopChanged();
+    }
+}
+
+void WindowModel::setCurrentVirtualDesktop(const QString &id)
+{
+    if (m_currentVirtualDesktop != id) {
+        m_currentVirtualDesktop = id;
+        if (m_filterByVirtualDesktop) {
+            refilter();
+        }
+    }
 }
 
 QHash<int, QByteArray> WindowModel::roleNames() const
@@ -331,9 +477,20 @@ void WindowModel::addWindow(PlasmaWindow *window)
     connect(window, &PlasmaWindow::appIdChanged, this, [this, window] {
         emitChanged(window, {AppId});
     });
+    connect(window, &PlasmaWindow::geometryChanged, this, [this] {
+        if (m_filterByScreen) {
+            refilter();
+        }
+    });
+    connect(window, &PlasmaWindow::virtualDesktopsChanged, this, [this] {
+        if (m_filterByVirtualDesktop) {
+            refilter();
+        }
+    });
     connect(window, &PlasmaWindow::stateChanged, this, [this, window](uint32_t changed) {
-        if (changed & State::state_skiptaskbar) {
-            updateShown(window);
+        // On all desktops and demanding attention matter for the virtual desktop filter
+        if (changed & (State::state_skiptaskbar | State::state_on_all_desktops | State::state_demands_attention)) {
+            refilter();
         }
         if (changed & State::state_minimized) {
             emitChanged(window, {IsMinimized});
@@ -349,15 +506,15 @@ void WindowModel::addWindow(PlasmaWindow *window)
             emitChanged(leaderOf(window), {IsDemandingAttention});
         }
     });
-    connect(window, &PlasmaWindow::parentWindowChanged, this, [this, window] {
-        updateShown(window);
+    connect(window, &PlasmaWindow::parentWindowChanged, this, [this] {
+        refilter();
         // The leader of a transient that is active or demands attention changed
         for (PlasmaWindow *row : std::as_const(m_rows)) {
             emitChanged(row, {IsActive, IsDemandingAttention});
         }
     });
 
-    updateShown(window);
+    refilter();
     if (window->parentWindow) {
         emitChanged(leaderOf(window), {IsActive, IsDemandingAttention});
     }
@@ -365,15 +522,9 @@ void WindowModel::addWindow(PlasmaWindow *window)
 
 void WindowModel::removeWindow(PlasmaWindow *window)
 {
-    const int row = rowOf(window);
-    if (row >= 0) {
-        beginRemoveRows(QModelIndex(), row, row);
-        m_rows.erase(m_rows.begin() + row);
-        endRemoveRows();
-        Q_EMIT countChanged();
-    }
     const PlasmaWindow *leader = window->parentWindow ? leaderOf(window) : nullptr;
     std::erase(m_windows, window);
+    refilter(); // removes its row
     disconnect(window, nullptr, this, nullptr);
     // Not deleted right away: we are inside a signal of this window, emitted from its Wayland event handler
     window->deleteLater();
@@ -398,23 +549,62 @@ void WindowModel::clear()
 
 bool WindowModel::isShown(const PlasmaWindow *window) const
 {
-    return !window->hasState(State::state_skiptaskbar) && !window->parentWindow;
+    if (window->hasState(State::state_skiptaskbar) || window->parentWindow) {
+        return false;
+    }
+
+    // Virtual desktop, as in the task manager: windows on all desktops and windows demanding attention
+    // are always shown
+    if (m_filterByVirtualDesktop && !m_currentVirtualDesktop.isEmpty() && !window->hasState(State::state_on_all_desktops)
+        && !window->virtualDesktops.isEmpty() && !window->virtualDesktops.contains(m_currentVirtualDesktop)
+        && !isDemandingAttention(window)) {
+        return false;
+    }
+
+    // Screen: the one the center of the window is on
+    if (m_filterByScreen && m_screenGeometry.isValid()) {
+        const QRect windowScreen = screenGeometryAt(window->geometry.center());
+        if (windowScreen.isValid() && windowScreen != m_screenGeometry) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
-void WindowModel::updateShown(PlasmaWindow *window)
+void WindowModel::refilter()
 {
-    const int row = rowOf(window);
-    const bool shown = isShown(window);
-    if (shown && row < 0) {
-        const int newRow = static_cast<int>(m_rows.size());
-        beginInsertRows(QModelIndex(), newRow, newRow);
-        m_rows.push_back(window);
-        endInsertRows();
-        Q_EMIT countChanged();
-    } else if (!shown && row >= 0) {
-        beginRemoveRows(QModelIndex(), row, row);
-        m_rows.erase(m_rows.begin() + row);
-        endRemoveRows();
+    std::vector<PlasmaWindow *> shown;
+    shown.reserve(m_windows.size());
+    for (PlasmaWindow *window : std::as_const(m_windows)) {
+        if (isShown(window)) {
+            shown.push_back(window);
+        }
+    }
+    if (shown == m_rows) {
+        return;
+    }
+    const size_t oldCount = m_rows.size();
+
+    // Both lists keep the order of m_windows. First the rows that are no longer shown go away, then the
+    // missing ones are inserted at their place: the buttons that stay are not touched (no flicker).
+    for (int row = static_cast<int>(m_rows.size()) - 1; row >= 0; --row) {
+        if (std::ranges::find(shown, m_rows.at(row)) == shown.end()) {
+            beginRemoveRows(QModelIndex(), row, row);
+            m_rows.erase(m_rows.begin() + row);
+            endRemoveRows();
+        }
+    }
+    for (size_t i = 0; i < shown.size(); ++i) {
+        if (i >= m_rows.size() || m_rows.at(i) != shown.at(i)) {
+            const int row = static_cast<int>(i);
+            beginInsertRows(QModelIndex(), row, row);
+            m_rows.insert(m_rows.begin() + row, shown.at(i));
+            endInsertRows();
+        }
+    }
+
+    if (m_rows.size() != oldCount) {
         Q_EMIT countChanged();
     }
 }
@@ -500,8 +690,16 @@ void WindowModel::move(int from, int to)
         return;
     }
     PlasmaWindow *window = m_rows.at(from);
+    PlasmaWindow *target = m_rows.at(to);
     m_rows.erase(m_rows.begin() + from);
     m_rows.insert(m_rows.begin() + to, window);
+
+    // The same move in the order of all windows: in front of or behind the window that was at 'to'.
+    // Hidden windows in between keep their place relative to the others.
+    std::erase(m_windows, window);
+    auto it = std::ranges::find(m_windows, target);
+    m_windows.insert(to > from ? it + 1 : it, window);
+
     endMoveRows();
 }
 

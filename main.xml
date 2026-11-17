@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    SPDX-FileCopyrightText: 2026 KrokusPokus
+
+    SPDX-License-Identifier: GPL-2.0-or-later
+-->
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+      http://www.kde.org/standards/kcfg/1.0/kcfg.xsd" >
+  <kcfgfile name=""/>
+
+  <!-- Names and defaults as in the task manager -->
+  <group name="General">
+    <entry name="showOnlyCurrentScreen" type="Bool">
+      <label>Whether to show only the windows on the same screen as the widget.</label>
+      <default>false</default>
+    </entry>
+    <entry name="showOnlyCurrentDesktop" type="Bool">
+      <label>Whether to show only the windows on the current virtual desktop.</label>
+      <default>true</default>
+    </entry>
+  </group>
+</kcfg>

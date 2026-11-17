@@ -15,20 +15,28 @@ include(KDECMakeSettings)
 include(KDECompilerSettings NO_POLICY_SCOPE)
 include(ECMQmlModule)
 
-find_package(Qt6 ${QT_MIN_VERSION} CONFIG REQUIRED COMPONENTS Core Gui Qml Quick Concurrent WaylandClient)
+find_package(Qt6 ${QT_MIN_VERSION} CONFIG REQUIRED COMPONENTS Core Gui Qml Quick Concurrent DBus WaylandClient)
+find_package(KF6 ${KF6_MIN_VERSION} REQUIRED COMPONENTS I18n)            # ki18n_install() for the translations
 find_package(Qt6GuiPrivate ${QT_MIN_VERSION} REQUIRED NO_MODULE)       # QNativeInterface::Private::QWaylandWindow
 find_package(Plasma REQUIRED)                                          # plasma_add_applet(), Plasma::Applet
 find_package(PlasmaWaylandProtocols 1.10 REQUIRED)                     # plasma-window-management.xml
 
 set(APPLET_ID io.github.krokuspokus.windowswitcher)
 
+# Plasma loads the translations of an applet from the catalog plasma_applet_<id>
+add_definitions(-DTRANSLATION_DOMAIN=\"plasma_applet_${APPLET_ID}\")
+
 plasma_add_applet(${APPLET_ID}
     QML_SOURCES
         qml/main.qml
         qml/WindowButton.qml
+        qml/config.qml
+        qml/ConfigGeneral.qml
     CPP_SOURCES
         src/windowmodel.cpp
         src/windowmodel.h
+    RESOURCES
+        main.xml
     GENERATE_APPLET_CLASS
 )
 
@@ -47,5 +55,9 @@ target_link_libraries(${APPLET_ID} PRIVATE
     Qt::Qml
     Qt::Quick
     Qt::Concurrent
+    Qt::DBus
     Qt::WaylandClient
 )
+
+# po/<language>/plasma_applet_<id>.po -> installed as .mo
+ki18n_install(po)
