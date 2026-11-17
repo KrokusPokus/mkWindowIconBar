@@ -13,7 +13,7 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
 import org.kde.ksvg as KSvg
 
-import plasma.applet.io.github.krokuspokus.windowswitcher as WindowSwitcher
+import plasma.applet.io.github.krokuspokus.windowiconbar as WindowIconBar
 
 PlasmoidItem {
     id: root
@@ -52,7 +52,7 @@ PlasmoidItem {
         }
     }
 
-    WindowSwitcher.WindowModel {
+    WindowIconBar.WindowModel {
         id: windowModel
 
         filterByScreen: Plasmoid.configuration.showOnlyCurrentScreen

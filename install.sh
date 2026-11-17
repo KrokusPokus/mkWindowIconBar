@@ -25,7 +25,8 @@ if [ "$1" = "--uninstall" ]; then
     # Only files: the manifest also lists directories like /usr/share/locale, which belong to the system
     echo "Removing:"
     files=()
-    while IFS= read -r file; do
+    # "|| [ -n ... ]": CMake writes no newline after the last line, read would skip it
+    while IFS= read -r file || [ -n "$file" ]; do
         if [ -n "$file" ] && [ ! -d "$file" ]; then
             files+=("$file")
             echo "  $file"

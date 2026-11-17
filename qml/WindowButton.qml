@@ -18,7 +18,7 @@ import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
 import org.kde.ksvg as KSvg
 
-import plasma.applet.io.github.krokuspokus.windowswitcher as WindowSwitcher
+import plasma.applet.io.github.krokuspokus.windowiconbar as WindowIconBar
 
 // One window: its icon on the task frame of the Plasma theme ("widgets/tasks").
 // Left click: activate, or minimize if it is the active window. Middle click: close.
@@ -28,7 +28,7 @@ Item {
 
     required property int index
     required property var model
-    required property WindowSwitcher.WindowModel windowModel
+    required property WindowIconBar.WindowModel windowModel
     required property ListView listView
     // Margins of the task frame, and the function that makes the frame prefixes for the panel edge
     property var taskFrameMargins

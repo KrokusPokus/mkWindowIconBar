@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(mkWindowSwitcher VERSION 0.1.0 LANGUAGES C CXX) # C: the generated Wayland protocol code
+project(mkWindowIconBar VERSION 0.1.0 LANGUAGES C CXX) # C: the generated Wayland protocol code
 
 set(QT_MIN_VERSION "6.8.0")
 set(KF6_MIN_VERSION "6.10.0")
@@ -21,7 +21,7 @@ find_package(Qt6GuiPrivate ${QT_MIN_VERSION} REQUIRED NO_MODULE)       # QNative
 find_package(Plasma REQUIRED)                                          # plasma_add_applet(), Plasma::Applet
 find_package(PlasmaWaylandProtocols 1.10 REQUIRED)                     # plasma-window-management.xml
 
-set(APPLET_ID io.github.krokuspokus.windowswitcher)
+set(APPLET_ID io.github.krokuspokus.windowiconbar)
 
 # Plasma loads the translations of an applet from the catalog plasma_applet_<id>
 add_definitions(-DTRANSLATION_DOMAIN=\"plasma_applet_${APPLET_ID}\")

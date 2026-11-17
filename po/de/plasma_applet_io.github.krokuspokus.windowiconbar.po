@@ -1,9 +1,9 @@
-# German translation of mkWindowSwitcher.
+# German translation of mkWindowIconBar.
 # SPDX-FileCopyrightText: 2026 KrokusPokus
 # SPDX-License-Identifier: GPL-2.0-or-later
 msgid ""
 msgstr ""
-"Project-Id-Version: mkWindowSwitcher\n"
+"Project-Id-Version: mkWindowIconBar\n"
 "PO-Revision-Date: 2026-11-17\n"
 "Last-Translator: KrokusPokus\n"
 "Language-Team: German\n"

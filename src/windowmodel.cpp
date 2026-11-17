@@ -36,7 +36,7 @@
 #include <sys/poll.h>
 #include <unistd.h>
 
-namespace WindowSwitcher
+namespace WindowIconBar
 {
 
 class PlasmaWindow : public QObject, public QtWayland::org_kde_plasma_window
@@ -112,7 +112,7 @@ protected:
     {
         int pipeFds[2];
         if (pipe2(pipeFds, O_CLOEXEC) != 0) {
-            qWarning() << "WindowSwitcher: failed creating pipe";
+            qWarning() << "WindowIconBar: failed creating pipe";
             return;
         }
         get_icon(pipeFds[1]);
@@ -128,16 +128,16 @@ protected:
             while (true) {
                 const int ready = poll(&pollFd, 1, 1000);
                 if (ready < 0 && errno != EINTR) {
-                    qWarning() << "WindowSwitcher: polling for icon of window" << uuid << "failed";
+                    qWarning() << "WindowIconBar: polling for icon of window" << uuid << "failed";
                     return QIcon();
                 } else if (ready == 0) {
-                    qWarning() << "WindowSwitcher: time out polling for icon of window" << uuid;
+                    qWarning() << "WindowIconBar: time out polling for icon of window" << uuid;
                     return QIcon();
                 } else {
                     char buffer[4096];
                     const int n = read(fd, buffer, sizeof(buffer));
                     if (n < 0) {
-                        qWarning() << "WindowSwitcher: error reading icon of window" << uuid;
+                        qWarning() << "WindowIconBar: error reading icon of window" << uuid;
                         return QIcon();
                     } else if (n > 0) {
                         data.append(buffer, n);
@@ -237,7 +237,7 @@ public:
         });
         initialize();
         if (!isActive()) {
-            qWarning() << "WindowSwitcher: the PlasmaWindowManagement protocol is not active. Not running in a Plasma Wayland session?";
+            qWarning() << "WindowIconBar: the PlasmaWindowManagement protocol is not active. Not running in a Plasma Wayland session?";
         }
     }
     ~PlasmaWindowManagement() override
@@ -248,7 +248,7 @@ public:
     }
 
 Q_SIGNALS:
-    void windowCreated(WindowSwitcher::PlasmaWindow *window);
+    void windowCreated(WindowIconBar::PlasmaWindow *window);
 
 protected:
     void org_kde_plasma_window_management_window_with_uuid(uint32_t id, const QString &uuid) override
@@ -258,10 +258,10 @@ protected:
     }
 };
 
-} // namespace WindowSwitcher
+} // namespace WindowIconBar
 
-using WindowSwitcher::PlasmaWindow;
-using WindowSwitcher::PlasmaWindowManagement;
+using WindowIconBar::PlasmaWindow;
+using WindowIconBar::PlasmaWindowManagement;
 using State = PlasmaWindow::state;
 
 namespace

@@ -10,12 +10,12 @@
         "Description": "Shows every open window as an icon and switches to it on click. The icon is the one the window sets itself.",
         "Description[de]": "Zeigt jedes offene Fenster als Symbol und wechselt per Klick dorthin. Das Symbol ist das, welches das Fenster selbst setzt.",
         "Icon": "preferences-system-windows",
-        "Id": "io.github.krokuspokus.windowswitcher",
+        "Id": "io.github.krokuspokus.windowiconbar",
         "License": "GPL-2.0-or-later",
         "Name": "Window Icon Bar",
         "Name[de]": "Fensterleiste mit Fenstersymbolen",
         "Version": "0.1.0",
-        "Website": "https://github.com/KrokusPokus/mkWindowSwitcher"
+        "Website": "https://github.com/KrokusPokus/mkWindowIconBar"
     },
     "X-Plasma-API-Minimum-Version": "6.0"
 }

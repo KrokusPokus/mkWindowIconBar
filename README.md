@@ -1,6 +1,6 @@
-# mkWindowSwitcher
+# mkWindowIconBar
 
-A minimalist window switcher for the KDE Plasma 6 panel. It replaces the
+A minimalist window bar for the KDE Plasma 6 panel. It replaces the
 *Icons-Only Task Manager* and nothing else: application launcher, system tray
 and the other panel widgets stay as they are.
 
@@ -16,7 +16,7 @@ icon. This is by design, see KDE bugs
 [369658](https://bugs.kde.org/show_bug.cgi?id=369658) and
 [476794](https://bugs.kde.org/show_bug.cgi?id=476794).
 
-mkWindowSwitcher shows the icon KWin reports for each window: the icon the
+mkWindowIconBar shows the icon KWin reports for each window: the icon the
 application set, otherwise the one of its `.desktop` file, otherwise a generic
 icon.
 

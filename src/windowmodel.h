@@ -25,7 +25,7 @@
 #include <memory>
 #include <vector>
 
-namespace WindowSwitcher
+namespace WindowIconBar
 {
 class PlasmaWindow;
 class PlasmaWindowManagement;
@@ -88,7 +88,7 @@ private Q_SLOTS:
     void setCurrentVirtualDesktop(const QString &id);
 
 private:
-    using PlasmaWindow = WindowSwitcher::PlasmaWindow;
+    using PlasmaWindow = WindowIconBar::PlasmaWindow;
 
     void addWindow(PlasmaWindow *window);
     void removeWindow(PlasmaWindow *window);
@@ -108,7 +108,7 @@ private:
     bool isActive(const PlasmaWindow *window) const;
     bool isDemandingAttention(const PlasmaWindow *window) const;
 
-    std::unique_ptr<WindowSwitcher::PlasmaWindowManagement> m_management;
+    std::unique_ptr<WindowIconBar::PlasmaWindowManagement> m_management;
     // All windows that sent their initial state, in the order of the bar (owned, deleted with deleteLater()).
     // Drag and drop reorders this list, so hidden windows come back at their place.
     std::vector<PlasmaWindow *> m_windows;
