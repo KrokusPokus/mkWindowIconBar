@@ -7,8 +7,8 @@
             }
         ],
         "Category": "Windows and Tasks",
-        "Description": "Shows every open window as an icon and switches to it on click. The icon is the one the window sets itself.",
-        "Description[de]": "Zeigt jedes offene Fenster als Symbol und wechselt per Klick dorthin. Das Symbol ist das, welches das Fenster selbst setzt.",
+        "Description": "Window bar displaying only the windows' own icons",
+        "Description[de]": "Fensterleiste nur mit den eigenen Symbolen der Fenster",
         "Icon": "preferences-system-windows",
         "Id": "io.github.krokuspokus.windowiconbar",
         "License": "GPL-2.0-or-later",
