@@ -1,0 +1,8 @@
+_hint() {
+  echo ":: plasmashell laedt Applet-Plugins nur beim Start. Neu starten mit:"
+  echo "   systemctl --user restart plasma-plasmashell.service"
+}
+
+post_install() { _hint; }
+post_upgrade() { _hint; }
+post_remove()  { _hint; }
