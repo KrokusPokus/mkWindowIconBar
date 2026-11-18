@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds the applet into build/. Install afterwards with ./install.sh, which runs:
+# Builds the applet into build/. Install afterwards with:
 #   sudo cmake --install build && systemctl --user restart plasma-plasmashell
 
 set -e
