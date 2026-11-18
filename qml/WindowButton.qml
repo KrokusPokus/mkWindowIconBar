@@ -221,10 +221,15 @@ PlasmaCore.ToolTipArea {
     onWidthChanged: publishGeometry()
     onHeightChanged: publishGeometry()
     Component.onCompleted: {
-        oldX = x;
-        oldY = y;
-        completed = true;
         publishGeometry();
+        // The list creates a new button at 0,0 and only then sets it to its place. That first placement is
+        // no move: a new button appears in its place, as in the task manager, instead of sliding in from the
+        // start of the list. So the starting point is taken once the list has placed the button.
+        Qt.callLater(() => {
+            oldX = x;
+            oldY = y;
+            completed = true;
+        });
     }
 
     // Distance dependent move animation (setting "distanceDependentAnimation"; otherwise the list animates the
