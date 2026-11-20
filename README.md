@@ -39,18 +39,21 @@ Not included on purpose: pinned launchers, startup notifications, grouping.
 ## Requirements
 
 * KDE Plasma 6 in a **Wayland** session (X11 is not supported)
-* For building: CMake, extra-cmake-modules, Qt 6 (incl. Wayland client), libplasma,
-  plasma-wayland-protocols
+* For building: CMake ≥ 3.22, extra-cmake-modules, Qt ≥ 6.8 (incl. Wayland client),
+  KDE Frameworks ≥ 6.10 (KI18n, KService), libplasma, plasma-wayland-protocols
 
 On Arch Linux:
 
 ```
-sudo pacman -S --needed cmake extra-cmake-modules qt6-base qt6-declarative qt6-wayland libplasma plasma-wayland-protocols
+sudo pacman -S --needed base-devel cmake extra-cmake-modules qt6-base qt6-declarative qt6-wayland \
+    ki18n kservice libplasma plasma-wayland-protocols
 ```
 
 ## Build and install
 
 ```
+git clone https://github.com/KrokusPokus/mkWindowIconBar.git
+cd mkWindowIconBar
 ./build.sh                                    # builds into build/
 sudo cmake --install build                    # installs system-wide (prefix /usr)
 sudo xargs rm < build/install_manifest.txt    # uninstalls again
