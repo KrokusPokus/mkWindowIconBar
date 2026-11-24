@@ -15,6 +15,9 @@ include(KDECMakeSettings)
 include(KDECompilerSettings NO_POLICY_SCOPE)
 include(ECMQmlModule)
 
+# NDEBUG for every build type except Debug, including None (package builds)
+add_compile_definitions($<$<NOT:$<CONFIG:Debug>>:NDEBUG>)
+
 find_package(Qt6 ${QT_MIN_VERSION} CONFIG REQUIRED COMPONENTS Core Gui Qml Quick Concurrent DBus WaylandClient)
 find_package(KF6 ${KF6_MIN_VERSION} REQUIRED COMPONENTS I18n Service)    # ki18n_install(); application names from .desktop files
 find_package(Qt6GuiPrivate ${QT_MIN_VERSION} REQUIRED NO_MODULE)       # QNativeInterface::Private::QWaylandWindow
